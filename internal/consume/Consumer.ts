@@ -294,8 +294,12 @@ export default class Consumer {
 		return !this.wasInSource() || this.value !== originalValue;
 	}
 
-	public wasInSource() {
-		return this.getDiagnosticLocation() !== undefined;
+	public wasInSource(): boolean {
+		const loc = this.getDiagnosticLocation();
+		return (
+			loc.filename !== undefined &&
+			(loc.start !== undefined || loc.end !== undefined)
+		);
 	}
 
 	public getKeyPathString(path: ConsumePath = this.keyPath): string {
@@ -377,7 +381,7 @@ export default class Consumer {
 
 		const {filename} = this;
 		let location = this.getDiagnosticLocation(target);
-		const fromSource = location !== undefined;
+		const fromSource = this.wasInSource();
 
 		const message = this.generateUnexpectedMessage(description.message, opts);
 		description = {
@@ -400,9 +404,8 @@ export default class Consumer {
 			// Go up the consumer tree and take the position from the first consumer found in the source
 			let consumer: undefined | Consumer = this;
 			do {
-				const possibleLocation = consumer.getDiagnosticLocation(target);
-				if (possibleLocation !== undefined) {
-					location = possibleLocation;
+				if (consumer.wasInSource()) {
+					location = consumer.getDiagnosticLocation(target);
 					break;
 				}
 				consumer = consumer.parent;
@@ -614,8 +617,12 @@ export default class Consumer {
 
 	public get(key: string, metadata?: ConsumePropertyMetadata): Consumer {
 		const value = this.asOriginalUnknownObject();
-		this.markUsedProperty(key);
-		return this.fork(key, value[key], metadata);
+		const valueKey =
+			metadata?.alternateName && this.has(metadata.alternateName)
+				? metadata.alternateName
+				: key;
+		this.markUsedProperty(valueKey);
+		return this.fork(key, value[valueKey], metadata);
 	}
 
 	public getIndex(index: number): Consumer {
@@ -771,6 +778,24 @@ export default class Consumer {
 		};
 	}
 
+	public isEmpty(): boolean {
+		const value = this.asUnknown();
+
+		if (value == null) {
+			return true;
+		}
+
+		if (value === "") {
+			return true;
+		}
+
+		if (isPlainObject(value)) {
+			return Object.keys(value).length === 0;
+		}
+
+		return false;
+	}
+
 	public asOriginalUnknownObject(optional: boolean = false): UnknownObject {
 		if (optional && !this.exists()) {
 			return {};
@@ -834,6 +859,10 @@ export default class Consumer {
 
 	public asMappedArray<T>(callback: (c: Consumer) => T): Array<T> {
 		return Array.from(this.asIterable(), callback);
+	}
+
+	public asImplicitArray(): Array<Consumer> {
+		return this.asImplicitMappedArray((c) => c);
 	}
 
 	public asImplicitMappedArray<T>(callback: (c: Consumer) => T): Array<T> {
@@ -950,7 +979,7 @@ export default class Consumer {
 			this.unexpected(
 				descriptions.CONSUME.INVALID_STRING_SET_VALUE(
 					value,
-					// rome-ignore lint/ts/noExplicitAny
+					// rome-ignore lint/ts/noExplicitAny: future cleanup
 					((validValues as any) as Array<string>),
 				),
 				{
@@ -1259,7 +1288,7 @@ export default class Consumer {
 			this.unexpected(
 				descriptions.CONSUME.INVALID_NUMBER_SET_VALUE(
 					value,
-					// rome-ignore lint/ts/noExplicitAny
+					// rome-ignore lint/ts/noExplicitAny: future cleanup
 					((validValues as any) as Array<number>),
 				),
 				{
@@ -1291,7 +1320,7 @@ export default class Consumer {
 		return this.value;
 	}
 
-	// rome-ignore lint/ts/noExplicitAny
+	// rome-ignore lint/ts/noExplicitAny: future cleanup
 	public asAny(): any {
 		return this.value;
 	}

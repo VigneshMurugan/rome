@@ -9,7 +9,7 @@ import {Consumer} from "@internal/consume";
 import {SemverVersionNode, parseSemverVersion} from "@internal/codec-semver";
 import {
 	SPDXExpressionNode,
-	parseSPDXLicense,
+	SpdxLicenseParser,
 } from "@internal/codec-spdx-license";
 import {normalizeDependencies, parseGitDependencyPattern} from "./dependencies";
 import {
@@ -27,7 +27,7 @@ import {
 } from "./types";
 import {tryParseWithOptionalOffsetPosition} from "@internal/parser-core";
 import {normalizeName} from "./name";
-import {Diagnostics, descriptions} from "@internal/diagnostics";
+import {descriptions} from "@internal/diagnostics";
 import {
 	AbsoluteFilePath,
 	RelativeFilePathMap,
@@ -36,6 +36,7 @@ import {
 import {toCamelCase} from "@internal/string-utils";
 import {PathPatterns, parsePathPattern} from "@internal/path-match";
 import {normalizeCompatManifest} from "@internal/codec-js-manifest/compat";
+import {ProjectDefinition} from "@internal/project";
 
 export * from "./types";
 
@@ -181,6 +182,7 @@ const INVALID_IGNORE_LICENSES = [
 function normalizeLicense(
 	consumer: Consumer,
 	loose: boolean,
+	projects: Array<ProjectDefinition>,
 ): undefined | SPDXExpressionNode {
 	if (!consumer.has("license")) {
 		return undefined;
@@ -213,6 +215,11 @@ function normalizeLicense(
 	}
 
 	// Parse as a SPDX expression
+	const spdxLisenceCode = new SpdxLicenseParser({
+		packageVersion: consumer.get("version").asString(),
+		packageName: consumer.get("name").asString(),
+		projects,
+	});
 	return tryParseWithOptionalOffsetPosition(
 		{
 			loose,
@@ -221,7 +228,7 @@ function normalizeLicense(
 		},
 		{
 			getOffsetPosition: () => licenseProp.getLocation("inner-value").start,
-			parse: (opts) => parseSPDXLicense(opts),
+			parse: (opts) => spdxLisenceCode.parse(opts),
 		},
 	);
 }
@@ -441,29 +448,23 @@ function normalizeExports(consumer: Consumer): boolean | ManifestExports {
 		return exports;
 	}
 
-	const dotConditions: ManifestExportConditions = new Map();
+	let dotConditionCount = 0;
 
 	for (const [relative, value] of consumer.asMap()) {
-		// If it's not a relative path then it's a platform for the root
 		if (relative[0] !== ".") {
 			if (exports.size > 0) {
 				value.unexpected(descriptions.MANIFEST.MIXED_EXPORTS_PATHS);
 			}
 
-			dotConditions.set(relative, createRelativeExportCondition(value));
-			continue;
-		}
-
-		if (dotConditions.size > 0) {
-			value.unexpected(descriptions.MANIFEST.MIXED_EXPORTS_PATHS);
+			dotConditionCount++;
 		}
 
 		const conditions = normalizeExportsConditions(value);
-		exports.set(value.getKey().asExplicitRelativeFilePath(), conditions);
+		exports.set(value.getKey().asRelativeFilePath(), conditions);
 	}
 
-	if (dotConditions.size > 0) {
-		exports.set(createRelativeFilePath("."), dotConditions);
+	if (dotConditionCount && dotConditionCount !== exports.size) {
+		consumer.unexpected(descriptions.MANIFEST.MIXED_EXPORTS_PATHS);
 	}
 
 	return exports;
@@ -618,19 +619,12 @@ function checkDependencyKeyTypo(key: string, prop: Consumer) {
 
 export async function normalizeManifest(
 	path: AbsoluteFilePath,
-	rawConsumer: Consumer,
-): Promise<{
-	manifest: Manifest;
-	diagnostics: Diagnostics;
-}> {
-	const loose = path.getSegments().includes("node_modules");
-
-	const {consumer, diagnostics} = rawConsumer.capture();
-
-	// FIXME: There's this ridiculous node module that includes it's tests... which deliberately includes an invalid package.json
-	if (path.join().includes("resolve/test/resolver/invalid_main")) {
-		consumer.setValue({});
-	}
+	consumer: Consumer,
+	projects: Array<ProjectDefinition>,
+): Promise<Manifest> {
+	const loose =
+		consumer.path !== undefined &&
+		consumer.path.getSegments().includes("node_modules");
 
 	// Check for typos. Ignore them in loose mode.
 	if (!loose) {
@@ -653,12 +647,12 @@ export async function normalizeManifest(
 		normalizeCompatManifest(consumer, name, version);
 	}
 
-	const manifest: Manifest = {
+	return {
 		name,
 		version,
 		private: normalizeBoolean(consumer, "private") === true,
 		description: normalizeString(consumer, "description"),
-		license: normalizeLicense(consumer, loose),
+		license: normalizeLicense(consumer, loose, projects),
 		type: consumer.get("type").asStringSetOrVoid(["module", "commonjs"]),
 		bin: normalizeBin(consumer, name.packageName, loose),
 		scripts: normalizeStringMap(consumer, "scripts", loose),
@@ -687,16 +681,11 @@ export async function normalizeManifest(
 			...normalizeStringArray(consumer.get("bundleDependencies"), loose),
 		],
 		// People fields
-		author: consumer.has("author")
+		author: consumer.has("author") && !consumer.get("author").isEmpty()
 			? normalizePerson(consumer.get("author"), loose)
 			: undefined,
 		contributors: normalizePeople(consumer.get("contributors"), loose),
 		maintainers: normalizePeople(consumer.get("maintainers"), loose),
 		raw: consumer.asJSONObject(),
-	};
-
-	return {
-		manifest,
-		diagnostics,
 	};
 }

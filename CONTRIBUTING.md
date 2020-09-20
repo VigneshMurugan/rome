@@ -87,6 +87,12 @@ If you would like to run only the test runner:
 ./rome test
 ```
 
+To run specific files:
+
+```bash
+./rome test path/to/files
+```
+
 And to update snapshots:
 
 ```bash
@@ -128,7 +134,7 @@ The created files will be listed in the console output. See those files for inli
 This is used to generate new ast nodes and boilerplate.
 
 ```bash
-./rome run scripts/ast-create-node [language] [nodeType] [category]
+./rome run scripts/ast-create-node [language]/[category]/[nodeType]
 ```
 
 The `language` is one of the language folders defined in [`https://github.com/romefrontend/rome/tree/main/internal/ast/`]
@@ -136,7 +142,7 @@ The `language` is one of the language folders defined in [`https://github.com/ro
 The `category` is one of the category folders inside the `language` folders.
 
 ```bash
-./rome run scripts/ast-create-node js JSArrayType typescript
+./rome run scripts/ast-create-node js/typescript/JSArrayType
 ```
 
 The created files will be listed in the console output.

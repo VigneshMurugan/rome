@@ -8,7 +8,7 @@ Rome stands out in the following ways:
 
 **Fixes:** We provide [fixes](#applying-fixes) for many lint errors, which can be applied automatically. If there are multiple ways to fix something then we [suggest](#suggested) multiple fixes that you can choose.
 
-**Reviewing:** We offer an [interactive CLI command](#reviewing) to make this process even easier. It allows you to go through each diagnostic and perform actions on them such inserting a suppression comment or applying a specific fix.
+**Reviewing:** We offer an [interactive CLI command](#reviewing) to make this process even easier. It allows you to go through each diagnostic and perform actions on them such as inserting a suppression comment or applying a specific fix.
 
 **Editor:** You can use an [editor integration](#editor-integration) to bring the power of Rome into your editor. This includes lint errors as you type, automatic formatting when saved, and code actions to select specific fixes.
 
@@ -139,24 +139,24 @@ Diagnostics consist of six main parts:
 
 #### Suppressions
 
-Diagnostics can be suppressed with a `rome-ignore` comment, followed by the diagnostic categories you want to suppress, and an optional explanation.
+Diagnostics can be suppressed with a `rome-ignore` comment. Comments must be followed by the diagnostic categories you want to suppress and a mandatory explanation.
 
 In **JavaScript** this can be a line comment:
 
 ```javascript
-// rome-ignore lint/js/useCamelCase
+// rome-ignore lint/js/useCamelCase: match upstream library casing
 ```
 
 In **JavaScript** and **CSS** it can be a block comment:
 
 ```javascript
-/* rome-ignore lint/js/useCamelCase */
+/* rome-ignore lint/js/useCamelCase: match upstream library casing  */
 ```
 
 And in **Markdown** and **HTML**:
 
 ```html
-<!-- rome-ignore categoryName -->
+<!-- rome-ignore html/useClosingNonVoid: allow self-closing divs -->
 ```
 
 ##### Enforcement
@@ -173,10 +173,10 @@ You can suppress multiple categories by separating them with a space.
 
 ##### Explanation
 
-You can provide an additional explanation for the suppressed error by prefixing it with a colon:
+You must provide an additional explanation for the suppressed error by prefixing it with a colon:
 
 ```javascript
-// rome-ignore lint/js/noExplicitAny: Explanation here
+// rome-ignore lint/js/noExplicitAny: explanation here
 ```
 
 ### Editor Integration

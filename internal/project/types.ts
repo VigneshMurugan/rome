@@ -7,7 +7,6 @@
 
 import {ManifestDefinition} from "@internal/codec-js-manifest";
 import {PathPatterns} from "@internal/path-match";
-import {BundlerMode} from "@internal/core";
 import {
 	AbsoluteFilePath,
 	AbsoluteFilePathSet,
@@ -17,6 +16,7 @@ import {
 import {Consumer} from "@internal/consume";
 import {RequiredProps} from "@internal/typescript-helpers";
 import {SemverRangeNode} from "@internal/codec-semver";
+import {LintRuleName} from "@internal/compiler";
 
 // Project wrapper that contains some other metadata
 export type ProjectDefinition = {
@@ -31,18 +31,38 @@ export type ProjectDefinition = {
 	initialized: boolean;
 };
 
+export type InvalidLicenses = Map<
+	string,
+	Array<{
+		name: string;
+		range: SemverRangeNode;
+	}>
+>;
+export type DependenciesExceptions = {
+	invalidLicenses: InvalidLicenses;
+};
+
+export type ProjectConfigPresetNames = "electron" | "cypress" | "jest";
+
 // Project config objects to categorize settings
 export type ProjectConfigObjects = {
+	presets: Array<ProjectConfigPresetNames>;
 	cache: {};
 	resolver: {};
 	compiler: {};
 	bundler: {
 		externals: Array<string>;
-		mode: BundlerMode;
+	};
+	format: {
+		enabled: boolean;
+		indentStyle: "tab" | "space";
+		indentSize: number;
 	};
 	lint: {
 		globals: Array<string>;
 		ignore: PathPatterns;
+		requireSuppressionExplanations: boolean;
+		disabledRules: Array<LintRuleName>;
 	};
 	typeCheck: {
 		enabled: boolean;
@@ -64,6 +84,7 @@ export type ProjectConfigObjects = {
 	};
 	dependencies: {
 		enabled: boolean;
+		exceptions: DependenciesExceptions;
 	};
 	targets: Map<string, ProjectConfigTarget>;
 };
@@ -88,7 +109,7 @@ export type PartialProjectConfig = Partial<ProjectConfigBase> & {
 	>
 };
 
-// rome-ignore lint/ts/noExplicitAny
+// rome-ignore lint/ts/noExplicitAny: future cleanup
 type PartialProjectValue<Type> = Type extends Map<string, any>
 	? Type
 	: Partial<Type>;
@@ -128,13 +149,13 @@ export function createDefaultProjectConfig(): ProjectConfig {
 		name: "unknown",
 		root: false,
 		version: undefined,
+		presets: [],
 		cache: {},
 		develop: {
 			serveStatic: true,
 		},
 		bundler: {
 			externals: [],
-			mode: "modern",
 		},
 		compiler: {},
 		resolver: {},
@@ -145,10 +166,20 @@ export function createDefaultProjectConfig(): ProjectConfig {
 		},
 		dependencies: {
 			enabled: false,
+			exceptions: {
+				invalidLicenses: new Map(),
+			},
+		},
+		format: {
+			enabled: true,
+			indentStyle: "tab",
+			indentSize: 1,
 		},
 		lint: {
 			ignore: [],
 			globals: [],
+			requireSuppressionExplanations: true,
+			disabledRules: [],
 		},
 		tests: {
 			ignore: [],

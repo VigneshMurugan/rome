@@ -9,12 +9,13 @@
 // all category names are defined. This allows the naming scheme to be more easily reviewed and
 // made consistent.
 export type DiagnosticCategory =
-	| LintDiagnosticCategory
+	| DiagnosticLintCategory
 	| "analyzeDependencies/cjsExportInES"
 	| "args/fileNotFound"
 	| "args/invalid"
 	| "bundler/moduleCycle"
 	| "bundler/topLevelAwait"
+	| "childProcess/failure"
 	| "commands/init/uncommittedChanges"
 	| "commands/init/expectedRepo"
 	| "compile/classes"
@@ -47,6 +48,7 @@ export type DiagnosticCategory =
 	| "parse/url/query"
 	| "parse/vscodeTheme"
 	| "projectManager/sensitiveDirectory"
+	| "projectManager/multipleConfigFiles"
 	| "projectManager/typoConfigFilename"
 	| "projectManager/misplacedConfig"
 	| "projectManager/missing"
@@ -65,6 +67,7 @@ export type DiagnosticCategory =
 	| "suppressions/incorrectPrefix"
 	| "suppressions/missingSpace"
 	| "suppressions/missingTarget"
+	| "suppressions/missingExplanation"
 	| "suppressions/unused"
 	| "tests/cancelled"
 	| "tests/disabled"
@@ -106,8 +109,8 @@ export type DiagnosticCategoryPrefix =
 	| "typeCheck"
 	| "v8";
 
-/* GENERATED:START(hash:a9dbbe8880fdb546a0b5377abfec1e1512553002,id:main) Everything below is automatically generated. DO NOT MODIFY. Run `./rome run scripts/generated-files/lint-rules` to update. */
-type LintDiagnosticCategory =
+/* GENERATED:START(hash:4fc28e881ad64941ef6ccfeb3edd1e9fa8b79578,id:main) Everything below is automatically generated. DO NOT MODIFY. Run `./rome run scripts/generated-files/lint-rules` to update. */
+export type DiagnosticLintCategory =
 	| "lint/html/useClosingNonVoid"
 	| "lint/js/noArguments"
 	| "lint/js/noAsyncPromiseExecutor"
@@ -139,6 +142,7 @@ type LintDiagnosticCategory =
 	| "lint/js/noSparseArray"
 	| "lint/js/noTemplateCurlyInString"
 	| "lint/js/noUndeclaredVariables"
+	| "lint/js/noUnnecessaryContinue"
 	| "lint/js/noUnsafeFinally"
 	| "lint/js/noUnsafeNegation"
 	| "lint/js/noUnusedTemplateLiteral"

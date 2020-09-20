@@ -68,8 +68,11 @@ export type WorkerLintOptions = {
 	compilerOptions?: LintCompilerOptions;
 	prefetchedModuleSignatures: PrefetchedModuleSignatures;
 	applySafeFixes: boolean;
+	suppressionExplanation?: string;
 	save: boolean;
 };
+
+export type WorkerFormatOptions = Omit<FormatterOptions, "projectConfig">;
 
 export type WorkerParseOptions = {
 	sourceTypeJS?: ConstJSSourceType;
@@ -200,7 +203,7 @@ export default class WorkerBridge extends Bridge {
 	public format = this.createEvent<
 		{
 			ref: FileReference;
-			options: FormatterOptions;
+			options: WorkerFormatOptions;
 			parseOptions: WorkerParseOptions;
 		},
 		undefined | WorkerFormatResult

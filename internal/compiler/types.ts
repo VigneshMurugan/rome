@@ -5,11 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import {
-	AnalyzeDependencyResult,
-	BundlerMode,
-	FileReference,
-} from "@internal/core";
+import {AnalyzeDependencyResult, FileReference} from "@internal/core";
 import {Path} from "@internal/compiler";
 import {AnyRoot} from "@internal/ast";
 import {ProjectConfig} from "@internal/project";
@@ -46,7 +42,7 @@ export interface Visitor<State extends UnknownObject> {
 	exit?: (path: Path, state: VisitorStateExit<State>) => ExitSignal;
 }
 
-// rome-ignore lint/ts/noExplicitAny
+// rome-ignore lint/ts/noExplicitAny: future cleanup
 export type AnyVisitor = Visitor<any>;
 
 export type AnyVisitors = Array<AnyVisitor>;
@@ -57,6 +53,7 @@ export type CompileRequest = TransformRequest & {
 
 export type LintRequest = TransformRequest & {
 	applySafeFixes: boolean;
+	suppressionExplanation?: string;
 };
 
 export type TransformProjectDefinition = {
@@ -81,7 +78,6 @@ export type BundleCompileResolvedImports = {
 };
 
 export type BundleCompileOptions = {
-	mode: BundlerMode;
 	moduleAll: boolean;
 	moduleId: string;
 	analyze: AnalyzeDependencyResult;

@@ -8,6 +8,7 @@
 import Server from "../Server";
 import {
 	ManifestDefinition,
+	manifestNameToString,
 	normalizeManifest,
 } from "@internal/codec-js-manifest";
 import {
@@ -15,7 +16,12 @@ import {
 	PROJECT_CONFIG_FILENAMES,
 	PROJECT_CONFIG_PACKAGE_JSON_FIELD,
 } from "@internal/project";
-import {DiagnosticsProcessor, catchDiagnostics} from "@internal/diagnostics";
+import {
+	Diagnostics,
+	DiagnosticsProcessor,
+	catchDiagnostics,
+	descriptions,
+} from "@internal/diagnostics";
 import {EventQueue} from "@internal/events";
 import {consumeJSON} from "@internal/codec-json";
 import {WorkerPartialManifest} from "../../common/bridges/WorkerBridge";
@@ -39,6 +45,7 @@ import {markup} from "@internal/markup";
 import {ReporterNamespace} from "@internal/cli-reporter";
 import {GlobOptions, Globber} from "./glob";
 import {VoidCallback} from "@internal/typescript-helpers";
+import {GlobalLock} from "@internal/async";
 
 // Paths that we will under no circumstance want to include
 const DEFAULT_DENYLIST = [
@@ -144,11 +151,16 @@ export default class MemoryFileSystem {
 		this.changedFileEvent = new EventQueue();
 		this.deletedFileEvent = new EventQueue();
 		this.newFileEvent = new EventQueue();
+
+		this.processingLock = new GlobalLock();
+		this.processingLock.attachLock(this.changedFileEvent.lock);
+		this.processingLock.attachLock(this.deletedFileEvent.lock);
 	}
 
 	public changedFileEvent: EventQueue<ChangedFileEventItem>;
 	public deletedFileEvent: EventQueue<AbsoluteFilePath>;
 	public newFileEvent: EventQueue<AbsoluteFilePath>;
+	public processingLock: GlobalLock;
 
 	private manifestCounter: number;
 	private watcherCounter: number;
@@ -198,15 +210,6 @@ export default class MemoryFileSystem {
 				}
 			}
 		}
-	}
-
-	public async flushFileEvents() {
-		const {server} = this;
-		await server.refreshFileEvent.flush();
-		await this.newFileEvent.flush();
-		await this.changedFileEvent.flush();
-		await this.deletedFileEvent.flush();
-		await server.projectManager.evictingProjectLock.waitLockDrained();
 	}
 
 	public hasBuffer(path: AbsoluteFilePath): boolean {
@@ -533,15 +536,17 @@ export default class MemoryFileSystem {
 		const promise = this.createWatcher(diagnostics, projectDirectory, id);
 		this.watchPromises.set(projectDirectory, promise);
 
-		const watcherClose = await promise;
-		this.watchers.set(
-			projectDirectory,
-			{
-				path: projectDirectory,
-				close: watcherClose,
-			},
-		);
-		this.watchPromises.delete(projectDirectory);
+		await this.processingLock.wrap(async () => {
+			const watcherClose = await promise;
+			this.watchers.set(
+				projectDirectory,
+				{
+					path: projectDirectory,
+					close: watcherClose,
+				},
+			);
+			this.watchPromises.delete(projectDirectory);
+		});
 
 		diagnostics.maybeThrowDiagnosticsError();
 	}
@@ -649,13 +654,30 @@ export default class MemoryFileSystem {
 			consumeDiagnosticCategory: "parse/manifest",
 		});
 
-		const {
-			manifest,
-			diagnostics: normalizedDiagnostics,
-		} = await normalizeManifest(path, consumer);
+		const projects = await this.server.projectManager.getProjectHierarchyFromPath(
+			path,
+		);
+		const {consumer: normalizeConsumer, diagnostics: rawDiagnostics} = consumer.capture();
+		const manifest = await normalizeManifest(path, normalizeConsumer, projects);
 
 		// If manifest is undefined then we failed to validate and have diagnostics
-		if (normalizedDiagnostics.length > 0) {
+		if (rawDiagnostics.length > 0) {
+			const normalizedDiagnostics: Diagnostics = rawDiagnostics.map((diag) => ({
+				...diag,
+				description: {
+					...diag.description,
+					advice: [
+						...diag.description.advice,
+						{
+							type: "log",
+							category: "info",
+							text: markup`Error occurred for package <emphasis>${manifestNameToString(
+								manifest.name,
+							)}</emphasis> at <emphasis>${path.getParent()}</emphasis>`,
+						},
+					],
+				},
+			}));
 			diagnostics.addDiagnostics(normalizedDiagnostics);
 			return;
 		}
@@ -914,6 +936,15 @@ export default class MemoryFileSystem {
 			dirname.getBasename() === PROJECT_CONFIG_DIRECTORY &&
 			PROJECT_CONFIG_FILENAMES.includes(basename)
 		) {
+			if (projectManager.hasLoadedProjectDirectory(dirname.getParent())) {
+				opts.diagnostics.addDiagnostic({
+					description: descriptions.PROJECT_MANAGER.MULTIPLE_CONFIGS,
+					location: {
+						filename: path.join(),
+					},
+				});
+			}
+
 			await projectManager.addDiskProject({
 				// Get the directory above .config
 				projectDirectory: dirname.getParent(),

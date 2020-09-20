@@ -219,6 +219,7 @@ class Manager {
 
 		if (activating) {
 			document.title = `${titles.join(": ")} — ${originalTitle}`;
+			history.replaceState({}, "", link.getAttribute("href"));
 		} else {
 			document.title = originalTitle;
 		}
@@ -411,6 +412,7 @@ class Manager {
 
 		if (this.scrollToHeading(href)) {
 			event.preventDefault();
+			location.hash = href;
 		}
 	}
 

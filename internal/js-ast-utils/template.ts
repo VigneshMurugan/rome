@@ -10,6 +10,7 @@ import {
 	AnyJSIdentifier,
 	AnyJSStatement,
 	AnyNode,
+	JSRoot,
 	jsRoot,
 } from "@internal/ast";
 import {CompilerContext, Path, signals} from "@internal/compiler";
@@ -146,7 +147,7 @@ export function template(
 		const {type, path} = placeholderPaths[i];
 
 		const substitute: AnyNode = createIdentifier(substitutions[i], type);
-		// rome-ignore lint/ts/noExplicitAny
+		// rome-ignore lint/ts/noExplicitAny: future cleanup
 		let target: any = newAst;
 
 		for (let i = 0; i < path.length; i++) {
@@ -198,4 +199,11 @@ template.statement = (
 		throw new Error("More than one statement isn't allowed for a template.");
 	}
 	return body[0];
+};
+
+template.root = (
+	strs: TemplateStringsArray,
+	...substitutions: TemplateSubstitions
+): JSRoot => {
+	return jsRoot.assert(template(strs, ...substitutions));
 };
